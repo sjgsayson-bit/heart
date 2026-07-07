@@ -1,0 +1,397 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>I Love You</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #1a0510 0%, #05010a 70%, #000000 100%);
+    font-family: 'Segoe UI', Arial, sans-serif;
+  }
+
+  #scene {
+    perspective: 1200px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #stage {
+    transform-style: preserve-3d;
+    transition: transform 0.15s ease-out;
+  }
+
+  canvas {
+    display: block;
+  }
+
+  #caption {
+    position: fixed;
+    bottom: 14%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: rgba(237, 144, 236, 0.75);
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    pointer-events: none;
+    text-shadow: 0 0 12px rgba(211, 101, 223, 0.7);
+    opacity: 0;
+    transition: opacity 0.9s ease;
+  }
+
+  #pressBtn {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 74px;
+    height: 74px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e640e3;
+    background: linear-gradient(180deg, #db52cb, #dd41da);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 22px rgba(203, 68, 218, 0.75), 0 4px 14px rgba(0,0,0,0.5);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    transition: opacity 0.7s ease, transform 0.35s ease, box-shadow 0.15s ease;
+    z-index: 5;
+    animation: btnPulse 1.8s ease-in-out infinite;
+  }
+  #pressBtn svg {
+    width: 32px;
+    height: 32px;
+    fill: #ba42b4;
+    pointer-events: none;
+  }
+  #pressBtn:hover {
+    box-shadow: 0 0 32px rgba(195, 26, 214, 0.95), 0 4px 18px rgba(0,0,0,0.5);
+  }
+  #pressBtn:active {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  #pressBtn.gone {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+    pointer-events: none;
+  }
+
+  @keyframes btnPulse {
+    0%, 100% { box-shadow: 0 0 22px rgba(211, 101, 223, 0.75), 0 4px 14px rgba(0,0,0,0.5); }
+    50% { box-shadow: 0 0 36px rgba(211, 101, 223, 0.95), 0 4px 14px rgba(0,0,0,0.5); }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene">
+  <div id="stage">
+    <canvas id="heartCanvas"></canvas>
+  </div>
+</div>
+<div id="caption"></div>
+<audio id="bgMusic" src="happiness.mp3" preload="auto"></audio>
+<button id="pressBtn" aria-label="Press to reveal">
+  <svg viewBox="0 0 24 24"><path d="M12 21s-6.716-4.35-9.428-8.03C.29 10.02.86 6.36 3.9 4.68c2.4-1.33 5.19-.6 6.7 1.44l1.4 1.9 1.4-1.9c1.51-2.04 4.3-2.77 6.7-1.44 3.04 1.68 3.61 5.34 1.33 8.29C18.716 16.65 12 21 12 21z"/></svg>
+</button>
+
+<script>
+const canvas = document.getElementById('heartCanvas');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const caption = document.getElementById('caption');
+const pressBtn = document.getElementById('pressBtn');
+const bgMusic = document.getElementById('bgMusic');
+
+let W, H, centerX, centerY;
+let pixelScale;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  centerX = W / 2;
+  centerY = H * 0.42;
+
+  const heartWidthUnits = 32;
+  const heartHeightUnits = 24;
+
+  const scaleByWidth = (W * 0.58) / heartWidthUnits;
+  const scaleByHeight = (H * 0.5) / heartHeightUnits;
+  pixelScale = Math.min(scaleByWidth, scaleByHeight);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ---- Heart parametric curve ----
+function heartCurve(t) {
+  const x = 16 * Math.pow(Math.sin(t), 3);
+  const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+  return { x, y };
+}
+
+
+const message = "I LOVE YOU I MISS YOU";
+const particles = [];
+
+
+const layerCount = 14; 
+
+for (let layer = 1; layer <= layerCount; layer++) {
+  const s = layer / layerCount;
+  const numPoints = Math.max(message.length, Math.floor(110 * s));
+  for (let i = 0; i < numPoints; i++) {
+    const t = (i / numPoints) * Math.PI * 2;
+    const p = heartCurve(t);
+    particles.push({
+      baseX: p.x * s,
+      baseY: p.y * s,
+      x: 0, y: 0,
+      vx: 0, vy: 0,
+      z: Math.random() * 4 - 2,
+      char: message[i % message.length],
+      hueShift: Math.random() * 20 - 10,
+      sizeJitter: 0.8 + Math.random() * 0.35
+    });
+  }
+}
+
+const outlinePoints = 180;
+for (let i = 0; i < outlinePoints; i++) {
+  const t = (i / outlinePoints) * Math.PI * 2;
+  const p = heartCurve(t);
+  particles.push({
+    baseX: p.x,
+    baseY: p.y,
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    z: Math.random() * 1.2,
+    char: message[i % message.length],
+    hueShift: Math.random() * 10 - 5,
+    sizeJitter: 0.95 + Math.random() * 0.25
+  });
+}
+
+const shellLayers = 4;
+for (let sl = 1; sl <= shellLayers; sl++) {
+  const s = 1 - sl * 0.045;
+  const numPoints = 130;
+  for (let i = 0; i < numPoints; i++) {
+    const t = (i / numPoints) * Math.PI * 2;
+    const p = heartCurve(t);
+    particles.push({
+      baseX: p.x * s,
+      baseY: p.y * s,
+      x: 0, y: 0,
+      vx: 0, vy: 0,
+      z: (sl / shellLayers) * 2.5 - 1.25,
+      char: message[i % message.length],
+      hueShift: Math.random() * 16 - 8,
+      sizeJitter: 0.85 + Math.random() * 0.3
+    });
+  }
+}
+
+particles.sort((a, b) => a.z - b.z);
+
+function placeOffscreen() {
+  const diag = Math.sqrt(W * W + H * H);
+  particles.forEach(p => {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = diag * (0.65 + Math.random() * 0.5);
+    p.x = centerX + Math.cos(angle) * radius;
+    p.y = centerY + Math.sin(angle) * radius;
+    p.vx = 0;
+    p.vy = 0;
+  });
+}
+placeOffscreen(); 
+
+// ---- Mouse tracking ----
+let mouseX = -9999, mouseY = -9999;
+let hasMouse = false;
+window.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  hasMouse = true;
+
+  const rx = ((e.clientY / H) - 0.5) * -26;
+  const ry = ((e.clientX / W) - 0.5) * 26;
+  stage.style.transform = `rotateX(${26 + rx}deg) rotateY(${ry}deg)`;
+});
+window.addEventListener('mouseleave', () => {
+  hasMouse = false;
+  mouseX = -9999;
+  mouseY = -9999;
+});
+window.addEventListener('touchmove', (e) => {
+  const t = e.touches[0];
+  if (t) {
+    mouseX = t.clientX;
+    mouseY = t.clientY;
+    hasMouse = true;
+  }
+}, { passive: true });
+window.addEventListener('touchend', () => {
+  hasMouse = false;
+  mouseX = -9999;
+  mouseY = -9999;
+});
+
+stage.style.transform = 'rotateX(26deg) rotateY(0deg)';
+
+// ---- Physics constants ----
+const SPRING = 0.03;
+const DAMPING = 0.72;
+const REPEL_RADIUS = 70;
+const REPEL_STRENGTH = 900;
+
+let time = 0;
+let formed = false; 
+
+function draw() {
+  time += 0.02;
+
+  const beatCycle = (time * 1.6) % (Math.PI * 2);
+  const beatRaw =
+    Math.max(0, Math.sin(beatCycle)) * 0.85 +
+    Math.max(0, Math.sin(beatCycle * 2 - 0.6)) * 0.35;
+  const beat = Math.min(1, beatRaw / 1.15); 
+  const pulse = 1 + beat * 0.09;
+
+  const baseHue = 340 + Math.sin(time * 0.3) * 10;
+  const lightness = 45 + beat * 20;
+
+  const fade = formed ? (0.25 + 0.75 * beat) : 0;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (formed) {
+    const glowRadius = Math.min(W, H) * (0.3 + beat * 0.05);
+    const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowRadius);
+    glow.addColorStop(0, `hsla(${baseHue}, 90%, ${30 + beat * 15}%, ${0.38 * fade})`);
+    glow.addColorStop(1, 'hsla(340, 90%, 10%, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  for (const p of particles) {
+    const homeX = centerX + p.baseX * pixelScale * pulse;
+    const homeY = centerY + p.baseY * pixelScale * pulse;
+
+    const dxHome = homeX - p.x;
+    const dyHome = homeY - p.y;
+    p.vx += dxHome * SPRING;
+    p.vy += dyHome * SPRING;
+
+    if (hasMouse && formed) {
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+      if (dist < REPEL_RADIUS) {
+        const force = (REPEL_RADIUS - dist) / REPEL_RADIUS * REPEL_STRENGTH;
+        p.vx += (dx / dist) * force * 0.02;
+        p.vy += (dy / dist) * force * 0.02;
+      }
+    }
+
+    p.vx *= DAMPING;
+    p.vy *= DAMPING;
+    p.x += p.vx;
+    p.y += p.vy;
+
+    const depthScale = 1 + p.z * 0.4;
+
+    const fontSize = Math.max(3, (pixelScale * 0.78 * p.sizeJitter) * depthScale * (1 + beat * 0.06));
+    const depthFade = Math.max(0.25, 1 - Math.abs(p.z) * 0.12);
+    const opacity = (0.55 + (p.z + 2) / 4 * 0.45) * fade * depthFade;
+
+    const hue = baseHue + p.hueShift;
+    ctx.font = `600 ${fontSize.toFixed(1)}px 'Segoe UI', Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = `hsla(${hue}, 85%, ${lightness + p.z * 6}%, ${opacity})`;
+    ctx.shadowColor = `hsla(${hue}, 90%, 55%, ${0.85 * fade})`;
+    ctx.shadowBlur = 6 + beat * 8 + Math.max(0, p.z) * 3;
+    ctx.fillText(p.char, p.x, p.y);
+  }
+  ctx.shadowBlur = 0;
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+
+// ---- Rotating caption lines ----
+// Edit this array to change the words shown at the bottom of the heart.
+// text     -> the line to display
+// duration -> how long (in milliseconds) that line stays fully visible
+//             before it fades out and the next line fades in
+const captionLines = [
+  { text: "'Cause I am the one, who's waited this long...", duration: 4000 },
+  { text: "And I am the one, that might get it wrong...", duration: 6000 },
+  { text: "And I'll be the one that will love you the way I'm supposed to...", duration: 7500 },
+  { text: "Oh Girl, oh.", duration: 5000 },
+  { text: "But will you still love me when nobody wants me around?", duration: 11000 },
+  { text: "When I turn 81 and forget things...?", duration: 6000 },
+  { text: "will you still be proud?", duration: 4000 }
+];
+
+const FADE_MS = 900;
+let captionIndex = 0;
+let captionTimer = null;
+
+function showNextCaption() {
+  if (!captionLines.length) return;
+
+  const line = captionLines[captionIndex % captionLines.length];
+
+  // fade out current text, then swap it and fade back in
+  caption.style.opacity = 0;
+  captionTimer = setTimeout(() => {
+    caption.textContent = line.text;
+    caption.style.opacity = 1;
+    captionIndex++;
+
+    // hold fully visible for (duration - fade time), then fade out and move on
+    const holdTime = Math.max(0, line.duration - FADE_MS);
+    captionTimer = setTimeout(showNextCaption, holdTime + FADE_MS);
+  }, FADE_MS);
+}
+
+function startCaptions() {
+  clearTimeout(captionTimer);
+  captionIndex = 0;
+  caption.style.opacity = 0;
+  captionTimer = setTimeout(showNextCaption, 300);
+}
+
+// ---- End of script ----
+
+pressBtn.addEventListener('click', () => {
+  placeOffscreen();
+  formed = true;
+
+  // plays happiness.mp3 — this file MUST sit in the same folder as this HTML file
+  bgMusic.currentTime = 0;
+  bgMusic.play();
+
+  pressBtn.classList.add('gone');
+  startCaptions();
+  setTimeout(() => { pressBtn.style.display = 'none'; }, 750);
+});
+</script>
+</body>
+</html>
